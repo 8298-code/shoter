@@ -1,20 +1,30 @@
 <!DOCTYPE html>
-<html>
+<html lang="es">
 <head>
 <meta charset="UTF-8">
-<title>Shooter Básico</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mini Shooter</title>
+
 <style>
-body {
-    margin: 0;
-    overflow: hidden;
-    background: black;
+*{
+    margin:0;
+    padding:0;
+    box-sizing:border-box;
 }
-canvas {
-    display: block;
+
+body{
+    overflow:hidden;
+    background:#000;
+}
+
+canvas{
+    display:block;
+    background:linear-gradient(#000010,#000000);
 }
 </style>
 </head>
 <body>
+
 <canvas id="game"></canvas>
 
 <script>
@@ -25,101 +35,292 @@ canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
 
 const player = {
-    x: canvas.width / 2,
+    x: canvas.width/2,
     y: canvas.height - 80,
-    size: 30,
-    speed: 6
+    width: 40,
+    height: 40,
+    speed: 7
 };
 
 let bullets = [];
 let enemies = [];
 let keys = {};
 
-document.addEventListener("keydown", e => keys[e.key] = true);
-document.addEventListener("keyup", e => keys[e.key] = false);
+let score = 0;
+let lives = 3;
+let gameOver = false;
 
-document.addEventListener("click", () => {
-    bullets.push({
-        x: player.x,
-        y: player.y,
-        speed: 8
-    });
+let enemySpawnRate = 1000;
+
+document.addEventListener("keydown", e => {
+
+    keys[e.key] = true;
+
+    if(e.code === "Space" && !gameOver){
+        shoot();
+    }
+
+    if((e.key === "r" || e.key === "R") && gameOver){
+        restartGame();
+    }
 });
 
-function spawnEnemy() {
-    enemies.push({
-        x: Math.random() * canvas.width,
-        y: -20,
-        size: 20,
-        speed: 2 + Math.random() * 2
+document.addEventListener("keyup", e => {
+    keys[e.key] = false;
+});
+
+document.addEventListener("click", () => {
+    if(!gameOver){
+        shoot();
+    }
+});
+
+function shoot(){
+    bullets.push({
+        x: player.x,
+        y: player.y - 20,
+        speed: 10
     });
 }
 
-setInterval(spawnEnemy, 1000);
+function spawnEnemy(){
 
-function update() {
+    enemies.push({
+        x: Math.random() * (canvas.width - 40) + 20,
+        y: -30,
+        radius: 20,
+        speed: 2 + Math.random() * 3
+    });
+}
 
-    if (keys["a"] || keys["ArrowLeft"])
+let enemySpawner = setInterval(spawnEnemy, enemySpawnRate);
+
+function restartGame(){
+
+    score = 0;
+    lives = 3;
+    gameOver = false;
+
+    bullets = [];
+    enemies = [];
+
+    player.x = canvas.width/2;
+
+    enemySpawnRate = 1000;
+
+    clearInterval(enemySpawner);
+    enemySpawner = setInterval(spawnEnemy, enemySpawnRate);
+}
+
+function update(){
+
+    if(gameOver) return;
+
+    if(keys["a"] || keys["A"] || keys["ArrowLeft"]){
         player.x -= player.speed;
+    }
 
-    if (keys["d"] || keys["ArrowRight"])
+    if(keys["d"] || keys["D"] || keys["ArrowRight"]){
         player.x += player.speed;
+    }
 
-    bullets.forEach((b, i) => {
-        b.y -= b.speed;
-        if (b.y < 0) bullets.splice(i, 1);
+    if(player.x < 20) player.x = 20;
+    if(player.x > canvas.width - 20) player.x = canvas.width - 20;
+
+    bullets.forEach((bullet,index)=>{
+
+        bullet.y -= bullet.speed;
+
+        if(bullet.y < -20){
+            bullets.splice(index,1);
+        }
     });
 
-    enemies.forEach((e, ei) => {
-        e.y += e.speed;
+    enemies.forEach((enemy,eIndex)=>{
 
-        bullets.forEach((b, bi) => {
-            const dx = e.x - b.x;
-            const dy = e.y - b.y;
-            const dist = Math.sqrt(dx*dx + dy*dy);
+        enemy.y += enemy.speed;
 
-            if (dist < e.size) {
-                enemies.splice(ei, 1);
-                bullets.splice(bi, 1);
+        bullets.forEach((bullet,bIndex)=>{
+
+            const dx = enemy.x - bullet.x;
+            const dy = enemy.y - bullet.y;
+            const distance = Math.sqrt(dx*dx + dy*dy);
+
+            if(distance < enemy.radius){
+
+                enemies.splice(eIndex,1);
+                bullets.splice(bIndex,1);
+
+                score += 10;
+
+                if(score % 100 === 0){
+
+                    clearInterval(enemySpawner);
+
+                    enemySpawnRate = Math.max(
+                        300,
+                        enemySpawnRate - 100
+                    );
+
+                    enemySpawner =
+                        setInterval(
+                            spawnEnemy,
+                            enemySpawnRate
+                        );
+                }
             }
         });
 
-        if (e.y > canvas.height)
-            enemies.splice(ei, 1);
+        if(enemy.y > canvas.height){
+
+            enemies.splice(eIndex,1);
+
+            lives--;
+
+            if(lives <= 0){
+                gameOver = true;
+            }
+        }
     });
 }
 
-function draw() {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+function drawPlayer(){
 
-    ctx.fillStyle = "lime";
-    ctx.fillRect(
-        player.x - player.size/2,
-        player.y - player.size/2,
-        player.size,
-        player.size
-    );
+    ctx.fillStyle = "#00ff00";
 
-    ctx.fillStyle = "yellow";
-    bullets.forEach(b => {
-        ctx.fillRect(b.x - 2, b.y, 4, 10);
+    ctx.beginPath();
+    ctx.moveTo(player.x, player.y - 25);
+    ctx.lineTo(player.x - 20, player.y + 20);
+    ctx.lineTo(player.x + 20, player.y + 20);
+    ctx.closePath();
+    ctx.fill();
+}
+
+function drawBullets(){
+
+    ctx.fillStyle = "#ffff00";
+
+    bullets.forEach(bullet=>{
+
+        ctx.fillRect(
+            bullet.x - 2,
+            bullet.y - 10,
+            4,
+            12
+        );
     });
+}
 
-    ctx.fillStyle = "red";
-    enemies.forEach(e => {
+function drawEnemies(){
+
+    ctx.fillStyle = "#ff3333";
+
+    enemies.forEach(enemy=>{
+
         ctx.beginPath();
-        ctx.arc(e.x, e.y, e.size, 0, Math.PI * 2);
+
+        ctx.arc(
+            enemy.x,
+            enemy.y,
+            enemy.radius,
+            0,
+            Math.PI*2
+        );
+
         ctx.fill();
     });
 }
 
-function gameLoop() {
+function drawHUD(){
+
+    ctx.fillStyle = "white";
+    ctx.font = "24px Arial";
+
+    ctx.fillText(
+        "Puntuación: " + score,
+        20,
+        40
+    );
+
+    ctx.fillText(
+        "Vidas: " + lives,
+        20,
+        75
+    );
+}
+
+function drawGameOver(){
+
+    if(!gameOver) return;
+
+    ctx.fillStyle = "rgba(0,0,0,0.7)";
+    ctx.fillRect(
+        0,
+        0,
+        canvas.width,
+        canvas.height
+    );
+
+    ctx.textAlign = "center";
+
+    ctx.fillStyle = "red";
+    ctx.font = "70px Arial";
+    ctx.fillText(
+        "GAME OVER",
+        canvas.width/2,
+        canvas.height/2 - 40
+    );
+
+    ctx.fillStyle = "white";
+    ctx.font = "35px Arial";
+    ctx.fillText(
+        "Puntuación: " + score,
+        canvas.width/2,
+        canvas.height/2 + 30
+    );
+
+    ctx.font = "25px Arial";
+    ctx.fillText(
+        "Pulsa R para reiniciar",
+        canvas.width/2,
+        canvas.height/2 + 90
+    );
+
+    ctx.textAlign = "left";
+}
+
+function draw(){
+
+    ctx.clearRect(
+        0,
+        0,
+        canvas.width,
+        canvas.height
+    );
+
+    drawPlayer();
+    drawBullets();
+    drawEnemies();
+    drawHUD();
+    drawGameOver();
+}
+
+function gameLoop(){
+
     update();
     draw();
+
     requestAnimationFrame(gameLoop);
 }
 
 gameLoop();
+
+window.addEventListener("resize", ()=>{
+
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+});
 </script>
+
 </body>
 </html>
