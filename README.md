@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Mini Shooter</title>
+<title>Carrera Arcade</title>
 
 <style>
 *{
@@ -13,313 +13,331 @@
 }
 
 body{
-    overflow:hidden;
-    background:#000;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    height:100vh;
+    background:#1a1a1a;
+    font-family:Arial,sans-serif;
 }
 
-canvas{
-    display:block;
-    background:linear-gradient(#000010,#000000);
+#game{
+    position:relative;
+    width:400px;
+    height:700px;
+    background:#444;
+    overflow:hidden;
+    border:5px solid white;
+    box-shadow:0 0 30px rgba(255,255,255,0.3);
+}
+
+/* Césped */
+#game::before,
+#game::after{
+    content:"";
+    position:absolute;
+    top:0;
+    width:50px;
+    height:100%;
+    background:#2d8a34;
+}
+
+#game::before{
+    left:0;
+}
+
+#game::after{
+    right:0;
+}
+
+/* Carretera */
+.road-line{
+    position:absolute;
+    left:195px;
+    width:10px;
+    height:80px;
+    background:white;
+}
+
+/* Marcador */
+#score{
+    position:absolute;
+    top:10px;
+    left:10px;
+    color:white;
+    font-size:28px;
+    font-weight:bold;
+    z-index:100;
+}
+
+/* COCHES */
+.car{
+    position:absolute;
+    width:50px;
+    height:80px;
+}
+
+/* Jugador */
+#player{
+    bottom:25px;
+    left:175px;
+}
+
+/* Enemigos */
+.enemy{
+    top:-100px;
+}
+
+/* Carrocería */
+.body{
+    position:absolute;
+    width:100%;
+    height:100%;
+    border-radius:12px;
+}
+
+/* Jugador rojo */
+#player .body{
+    background:linear-gradient(to bottom,#ff6666,#b40000);
+    box-shadow:0 0 15px rgba(255,0,0,.7);
+}
+
+/* Enemigo azul */
+.enemy .body{
+    background:linear-gradient(to bottom,#6ba9ff,#0047c2);
+    box-shadow:0 0 10px rgba(0,100,255,.5);
+}
+
+/* Ventanas */
+.window{
+    position:absolute;
+    top:12px;
+    left:10px;
+    width:30px;
+    height:20px;
+    background:#9fe7ff;
+    border-radius:4px;
+}
+
+/* Luneta trasera */
+.rear-window{
+    position:absolute;
+    bottom:15px;
+    left:12px;
+    width:26px;
+    height:12px;
+    background:#9fe7ff;
+    border-radius:4px;
+}
+
+/* Ruedas */
+.wheel{
+    position:absolute;
+    width:8px;
+    height:18px;
+    background:#111;
+    border-radius:3px;
+}
+
+.lt{left:-4px;top:10px;}
+.rt{right:-4px;top:10px;}
+.lb{left:-4px;bottom:10px;}
+.rb{right:-4px;bottom:10px;}
+
+/* Faros */
+.headlight{
+    position:absolute;
+    width:8px;
+    height:8px;
+    background:#ffffcc;
+    border-radius:50%;
+    top:4px;
+}
+
+.hl{left:6px;}
+.hr{right:6px;}
+
+/* Pilotos traseros */
+.taillight{
+    position:absolute;
+    width:8px;
+    height:8px;
+    background:red;
+    border-radius:50%;
+    bottom:4px;
+}
+
+.tl{left:6px;}
+.tr{right:6px;}
+
+#message{
+    position:absolute;
+    top:50%;
+    left:50%;
+    transform:translate(-50%,-50%);
+    color:white;
+    font-size:42px;
+    font-weight:bold;
+    display:none;
+    z-index:200;
 }
 </style>
 </head>
 <body>
 
-<canvas id="game"></canvas>
+<div id="game">
+    <div id="score">0</div>
+    <div id="message">GAME OVER</div>
+
+    <div id="player" class="car">
+        <div class="body"></div>
+        <div class="window"></div>
+        <div class="rear-window"></div>
+
+        <div class="wheel lt"></div>
+        <div class="wheel rt"></div>
+        <div class="wheel lb"></div>
+        <div class="wheel rb"></div>
+
+        <div class="headlight hl"></div>
+        <div class="headlight hr"></div>
+
+        <div class="taillight tl"></div>
+        <div class="taillight tr"></div>
+    </div>
+</div>
 
 <script>
-const canvas = document.getElementById("game");
-const ctx = canvas.getContext("2d");
 
-canvas.width = window.innerWidth;
-canvas.height = window.innerHeight;
+const game = document.getElementById("game");
+const player = document.getElementById("player");
+const scoreText = document.getElementById("score");
+const message = document.getElementById("message");
 
-const player = {
-    x: canvas.width/2,
-    y: canvas.height - 80,
-    width: 40,
-    height: 40,
-    speed: 7
-};
-
-let bullets = [];
-let enemies = [];
-let keys = {};
-
+let playerX = 175;
 let score = 0;
-let lives = 3;
+let speed = 6;
 let gameOver = false;
 
-let enemySpawnRate = 1000;
+/* Líneas de carretera */
 
-document.addEventListener("keydown", e => {
-
-    keys[e.key] = true;
-
-    if(e.code === "Space" && !gameOver){
-        shoot();
-    }
-
-    if((e.key === "r" || e.key === "R") && gameOver){
-        restartGame();
-    }
-});
-
-document.addEventListener("keyup", e => {
-    keys[e.key] = false;
-});
-
-document.addEventListener("click", () => {
-    if(!gameOver){
-        shoot();
-    }
-});
-
-function shoot(){
-    bullets.push({
-        x: player.x,
-        y: player.y - 20,
-        speed: 10
-    });
+for(let i=0;i<8;i++){
+    const line = document.createElement("div");
+    line.className="road-line";
+    line.style.top=(i*100)+"px";
+    game.appendChild(line);
 }
 
-function spawnEnemy(){
+/* Crear coche enemigo */
 
-    enemies.push({
-        x: Math.random() * (canvas.width - 40) + 20,
-        y: -30,
-        radius: 20,
-        speed: 2 + Math.random() * 3
-    });
+function createEnemy(){
+
+    const enemy = document.createElement("div");
+    enemy.className="car enemy";
+
+    enemy.innerHTML=`
+        <div class="body"></div>
+        <div class="window"></div>
+        <div class="rear-window"></div>
+
+        <div class="wheel lt"></div>
+        <div class="wheel rt"></div>
+        <div class="wheel lb"></div>
+        <div class="wheel rb"></div>
+
+        <div class="headlight hl"></div>
+        <div class="headlight hr"></div>
+
+        <div class="taillight tl"></div>
+        <div class="taillight tr"></div>
+    `;
+
+    const lanes=[75,125,175,225,275];
+    enemy.style.left=
+        lanes[Math.floor(Math.random()*lanes.length)]+"px";
+
+    enemy.style.top="-100px";
+
+    game.appendChild(enemy);
+
+    return enemy;
 }
 
-let enemySpawner = setInterval(spawnEnemy, enemySpawnRate);
+const enemy=createEnemy();
 
-function restartGame(){
+document.addEventListener("keydown",(e)=>{
 
-    score = 0;
-    lives = 3;
-    gameOver = false;
+    if(gameOver) return;
 
-    bullets = [];
-    enemies = [];
+    if(e.key==="ArrowLeft"){
+        playerX=Math.max(75,playerX-50);
+    }
 
-    player.x = canvas.width/2;
+    if(e.key==="ArrowRight"){
+        playerX=Math.min(275,playerX+50);
+    }
 
-    enemySpawnRate = 1000;
-
-    clearInterval(enemySpawner);
-    enemySpawner = setInterval(spawnEnemy, enemySpawnRate);
-}
+    player.style.left=playerX+"px";
+});
 
 function update(){
 
     if(gameOver) return;
 
-    if(keys["a"] || keys["A"] || keys["ArrowLeft"]){
-        player.x -= player.speed;
+    document.querySelectorAll(".road-line").forEach(line=>{
+
+        let y=parseInt(line.style.top);
+
+        y+=speed;
+
+        if(y>700){
+            y=-80;
+        }
+
+        line.style.top=y+"px";
+    });
+
+    let enemyY=parseInt(enemy.style.top);
+
+    enemyY+=speed+2;
+
+    if(enemyY>750){
+
+        enemyY=-100;
+
+        const lanes=[75,125,175,225,275];
+
+        enemy.style.left=
+            lanes[Math.floor(Math.random()*lanes.length)]+"px";
+
+        score++;
+        scoreText.textContent=score;
+
+        if(score%5===0){
+            speed+=0.5;
+        }
     }
 
-    if(keys["d"] || keys["D"] || keys["ArrowRight"]){
-        player.x += player.speed;
+    enemy.style.top=enemyY+"px";
+
+    const p=player.getBoundingClientRect();
+    const e=enemy.getBoundingClientRect();
+
+    if(
+        p.left<e.right &&
+        p.right>e.left &&
+        p.top<e.bottom &&
+        p.bottom>e.top
+    ){
+        gameOver=true;
+        message.style.display="block";
     }
 
-    if(player.x < 20) player.x = 20;
-    if(player.x > canvas.width - 20) player.x = canvas.width - 20;
-
-    bullets.forEach((bullet,index)=>{
-
-        bullet.y -= bullet.speed;
-
-        if(bullet.y < -20){
-            bullets.splice(index,1);
-        }
-    });
-
-    enemies.forEach((enemy,eIndex)=>{
-
-        enemy.y += enemy.speed;
-
-        bullets.forEach((bullet,bIndex)=>{
-
-            const dx = enemy.x - bullet.x;
-            const dy = enemy.y - bullet.y;
-            const distance = Math.sqrt(dx*dx + dy*dy);
-
-            if(distance < enemy.radius){
-
-                enemies.splice(eIndex,1);
-                bullets.splice(bIndex,1);
-
-                score += 10;
-
-                if(score % 100 === 0){
-
-                    clearInterval(enemySpawner);
-
-                    enemySpawnRate = Math.max(
-                        300,
-                        enemySpawnRate - 100
-                    );
-
-                    enemySpawner =
-                        setInterval(
-                            spawnEnemy,
-                            enemySpawnRate
-                        );
-                }
-            }
-        });
-
-        if(enemy.y > canvas.height){
-
-            enemies.splice(eIndex,1);
-
-            lives--;
-
-            if(lives <= 0){
-                gameOver = true;
-            }
-        }
-    });
+    requestAnimationFrame(update);
 }
 
-function drawPlayer(){
+update();
 
-    ctx.fillStyle = "#00ff00";
-
-    ctx.beginPath();
-    ctx.moveTo(player.x, player.y - 25);
-    ctx.lineTo(player.x - 20, player.y + 20);
-    ctx.lineTo(player.x + 20, player.y + 20);
-    ctx.closePath();
-    ctx.fill();
-}
-
-function drawBullets(){
-
-    ctx.fillStyle = "#ffff00";
-
-    bullets.forEach(bullet=>{
-
-        ctx.fillRect(
-            bullet.x - 2,
-            bullet.y - 10,
-            4,
-            12
-        );
-    });
-}
-
-function drawEnemies(){
-
-    ctx.fillStyle = "#ff3333";
-
-    enemies.forEach(enemy=>{
-
-        ctx.beginPath();
-
-        ctx.arc(
-            enemy.x,
-            enemy.y,
-            enemy.radius,
-            0,
-            Math.PI*2
-        );
-
-        ctx.fill();
-    });
-}
-
-function drawHUD(){
-
-    ctx.fillStyle = "white";
-    ctx.font = "24px Arial";
-
-    ctx.fillText(
-        "Puntuación: " + score,
-        20,
-        40
-    );
-
-    ctx.fillText(
-        "Vidas: " + lives,
-        20,
-        75
-    );
-}
-
-function drawGameOver(){
-
-    if(!gameOver) return;
-
-    ctx.fillStyle = "rgba(0,0,0,0.7)";
-    ctx.fillRect(
-        0,
-        0,
-        canvas.width,
-        canvas.height
-    );
-
-    ctx.textAlign = "center";
-
-    ctx.fillStyle = "red";
-    ctx.font = "70px Arial";
-    ctx.fillText(
-        "GAME OVER",
-        canvas.width/2,
-        canvas.height/2 - 40
-    );
-
-    ctx.fillStyle = "white";
-    ctx.font = "35px Arial";
-    ctx.fillText(
-        "Puntuación: " + score,
-        canvas.width/2,
-        canvas.height/2 + 30
-    );
-
-    ctx.font = "25px Arial";
-    ctx.fillText(
-        "Pulsa R para reiniciar",
-        canvas.width/2,
-        canvas.height/2 + 90
-    );
-
-    ctx.textAlign = "left";
-}
-
-function draw(){
-
-    ctx.clearRect(
-        0,
-        0,
-        canvas.width,
-        canvas.height
-    );
-
-    drawPlayer();
-    drawBullets();
-    drawEnemies();
-    drawHUD();
-    drawGameOver();
-}
-
-function gameLoop(){
-
-    update();
-    draw();
-
-    requestAnimationFrame(gameLoop);
-}
-
-gameLoop();
-
-window.addEventListener("resize", ()=>{
-
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
-});
 </script>
 
 </body>
